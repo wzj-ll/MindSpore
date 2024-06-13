@@ -242,7 +242,7 @@ MindSpore是华为推出的一款人工智能计算框架，主要用于开发AI
 
 MSAdapter的API完全参照PyTorch设计，用户仅需少量修改就能轻松地将PyTorch代码高效运行在昇腾上。目前MSAdapter已经适配**torch、torch.nn**等800+接口。
 
-![image-20240613153040483](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613153040483.png)
+![image-20240613153040483](MSA_F.png)
 
 ### 3.2 环境安装
 
@@ -432,14 +432,14 @@ visualize(model, test_inputs, test_labels, losses, path="./videos", dpi=300)
 
 代码执行完毕后，会在`./video`目录下生成图片流，如下所示：
 
-![video_animation](D:\VSCode\video_animation.gif)
+![video_animation](video_animation.gif)
 
 所生成的误差曲线图，在对其进行归一化之后如下所示：
 
-![image-20240613163219225](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613163219225.png)
+![image-20240613163219225](Normalized_L2_Errors.png)
 
 损失曲线如下：
 
-![image-20240613163514757](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613163514757.png)
+![image-20240613163514757](videos/Normalized_Loss.png)
 
 根据误差曲线图，可以得知该模型的性能在训练过程中是逐步提升的
