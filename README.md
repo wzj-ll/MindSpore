@@ -1,10 +1,10 @@
 ## 1. 论文介绍
 
-#### 1.1 背景介绍
+### 1.1 背景介绍
 
 物理信息神经网络（PINNs）是一种结合了物理定律和机器学习的新型深度学习方法。这种方法的核心思想是将物理定律（通常以偏微分方程(PDEs) 的形式表示）嵌入到神经网络的损失函数中，从而训练出符合物理规律的模型。PINNs 可以用于解决多种物理问题，包括流体力学、量子力学、反应扩散系统和非线性浅水波的传播等。
 
-#### 1.2 论文方法
+### 1.2 论文方法
 
 《Physics-Informed Neural Networks: A Deep Learning Framework for Solving Forward and Inverse Problems Involving Nonlinear Partial Differential Equations》
 
@@ -17,10 +17,10 @@
 - 适用广泛：PINNs 可以应用于各种物理问题，包括流体力学、量子力学等 。
 - 自动微分：利用自动微分技术，PINNs 可以精确地计算物理约束条件，提升了模型的精度和稳定性 。
 
-#### 1.3 数据集介绍
+### 1.3 数据集介绍
 论文中使用的数据集主要是通过数值模拟生成的高分辨率数据集。例如，在研究流体绕圆柱流动问题时，使用了高阶光谱/hp-元素求解器生成的数值模拟数据。这些数据包括流体的速度场和压力场分布，用于训练和验证 PINNs 模型。
 
-#### 1.4 Pipeline
+### 1.4 Pipeline
 - 创建数据集：通过数值模拟生成高分辨率数据集，包含流体的速度场和压力场。
 
 - 构建模型：设计一个深度神经网络，输入为时间和空间坐标，输出为速度场和压力场。
@@ -37,7 +37,7 @@
 
 ## 2. pytorch实现版本
 
-#### 2.1 准备工作
+### 2.1 准备工作
 
 创建环境：
 
@@ -196,7 +196,7 @@ D:.
         utils.cpython-312.pyc
 ```
 
-#### 2.2 运行代码
+### 2.2 运行代码
 
 执行脚本`train.py`，训练20轮的输出结果如下：
 
@@ -224,19 +224,11 @@ Epoch 20/20, Loss: 0.029648902312862366
 L2 Error: 1.0292717218399048
 ```
 
-代码执行完毕后，会在`./video`目录下生成图片流，图片如下所示：
 
-![image-20240608160435078](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240608160435078.png)
 
-![](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240608160557346.png)
+## 3.MindSpore实现版本
 
-所生成的误差曲线图，在对其进行归一化之后如下所示：
-
-![image-20240608161753631](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240608161753631.png)
-
-### 3.MindSpore实现版本
-
-#### 3.1 MindSpore框架介绍
+### 3.1 MindSpore框架介绍
 
 MindSpore是华为推出的一款人工智能计算框架，主要用于开发AI应用和模型。它的特点如下:
 
@@ -246,7 +238,208 @@ MindSpore是华为推出的一款人工智能计算框架，主要用于开发AI
 - 运算符和层：MindSpore提供丰富的神经网络层和运算符，覆盖CNN、RNN、GAN等多种模型；
 - 训练和部署：MindSpore提供方便的模型训练和部署功能，支持ONNX、CANN和MindSpore格式的模型导出，可以部署到Ascend、GPU、CPU等硬件
 
+为了高效率迁移模型及代码，此处使用鹏城实验室和华为联合开发的一款Mindspore生态适配工具——**MSadapter**。该工具能帮助用户高效使用昇腾算力，且在不改变原有PyTorch用户使用习惯的前提下，将代码快速迁移到Mindspore生态上。
 
+MSAdapter的API完全参照PyTorch设计，用户仅需少量修改就能轻松地将PyTorch代码高效运行在昇腾上。目前MSAdapter已经适配**torch、torch.nn**等800+接口。
 
+![image-20240613153040483](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613153040483.png)
 
+### 3.2 环境安装
 
+首先在本地启用WSL（Windows Subsystem for Linux）功能，安装Ubuntu，并安装MindSpore框架，使用2.0.0版本，以便搭配msadapter来进行便捷的模型迁移
+
+- 通过pip安装MindSpore并验证：
+
+```bash
+pip install mindspore==2.0.0	#安装MindSpore
+
+#验证是否成功安装
+python -c "import mindspore;mindspore.run_check()"
+
+#如果输出以下内容则安装成功
+MindSpore version:  2.0.0
+The result of multiplication calculation is correct, MindSpore has been installed on platform [CPU] successfully!
+```
+
+- 安装msadapter
+
+```bash
+#该命令只能应用于版本为2.0.0的MindSpore框架
+pip install msadapter
+```
+
+安装完成之后便可以直接进行模型迁移
+
+### 3.3 模型迁移
+
+- 替换导入模块（修改头文件）
+
+```python
+# import torch
+# from torch.utils.data import Dataset
+# from torch import nn
+# from torch.utils.data import DataLoader
+
+from msadapter.pytorch.utils.data import Dataset
+import msadapter.pytorch as torch
+import msadapter.pytorch.optim as optim
+import mindspore
+from mindspore import Tensor, context, ops, nn
+```
+
+- 替换网络训练脚本
+
+```python
+# pytorch 写法
+# optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
+# MindSpore 写法
+optimizer = optim.SGD(model.trainable_params(), learning_rate=0.01, momentum=0.9)
+```
+
+更多迁移细节可参考：https://openi.pcl.ac.cn/OpenI/MSAdapter
+
+### 3.4 详细迁移代码
+
+#### 数据集实现
+
+```python
+import os
+import numpy as np
+# import torch
+# from torch.utils.data import Dataset
+from msadapter.pytorch.utils.data import Dataset
+import msadapter.pytorch as torch
+
+class FlowDataset(Dataset):
+    def __init__(self, data_dir, bc_points_file, bc_labels_file, ic_points_file, ic_labels_file):
+        self.bc_points = np.load(os.path.join(data_dir, bc_points_file))
+        self.bc_labels = np.load(os.path.join(data_dir, bc_labels_file))
+        self.ic_points = np.load(os.path.join(data_dir, ic_points_file))
+        self.ic_labels = np.load(os.path.join(data_dir, ic_labels_file))
+
+        self.bc_len = len(self.bc_points)
+        self.ic_len = len(self.ic_points)
+
+    def __len__(self):
+        return max(self.bc_len, self.ic_len)
+
+    def __getitem__(self, idx):
+        bc_idx = idx % self.bc_len
+        ic_idx = idx % self.ic_len
+
+        # 合并边界条件和初始条件
+        points = np.concatenate((self.bc_points[bc_idx], self.ic_points[ic_idx]), axis=0)
+        labels = np.concatenate((self.bc_labels[bc_idx], self.ic_labels[ic_idx]), axis=0)
+
+        # 确保点的数量是 3
+        points = points[:3]
+        labels = labels[:3]
+
+        return torch.tensor(points, dtype=torch.float32), torch.tensor(labels, dtype=torch.float32)
+
+def create_datasets(data_dir):
+    train_dataset = FlowDataset(
+        data_dir,
+        bc_points_file="bc_points.npy",
+        bc_labels_file="bc_label.npy",
+        ic_points_file="ic_points.npy",
+        ic_labels_file="ic_label.npy"
+    )
+    return train_dataset
+
+def create_test_dataset(data_dir):
+    inputs = np.load(os.path.join(data_dir, 'eval_points.npy'))
+    labels = np.load(os.path.join(data_dir, 'eval_label.npy'))
+    return inputs, labels
+```
+
+#### 训练过程
+
+```python
+import numpy as np
+# from torch import nn
+# from torch.utils.data import DataLoader
+import msadapter.pytorch.nn as nn
+import msadapter.pytorch.optim as optim
+from msadapter.pytorch.utils.data import DataLoader
+from model import DeepModel
+from dataload import create_datasets, create_test_dataset
+from utils import train, evaluate, visualize
+import matplotlib.pyplot as plt
+
+# 设置设备
+device = "cuda"
+
+# 配置文件
+config = {
+    "data_dir": "./dataset",
+    "bc_points_file": "bc_points.npy",
+    "bc_labels_file": "bc_label.npy",
+    "ic_points_file": "ic_points.npy",
+    "ic_labels_file": "ic_label.npy"
+}
+
+# 创建数据集和数据加载器
+train_dataset = create_datasets(config["data_dir"])
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+
+# 实例化模型
+model = DeepModel().to(device)
+# 定义损失函数和优化器
+criterion = nn.MSELoss()
+# optimizer = nn.optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.SGD(model.trainable_params(), learning_rate=0.01, momentum=0.9)
+# 训练模型
+loss_file = "losses.npz"
+losses, l2_error_u, l2_error_v, l2_error_p, l2_error_total = train(model, 
+        train_loader, criterion, optimizer, epochs=10, device=device, loss_file=loss_file)
+# 测试数据
+test_inputs, test_labels = create_test_dataset(config["data_dir"])
+
+# 评估模型
+evaluate(model, test_inputs)
+
+# 可视化结果
+# 加载 loss 值
+data = np.load("losses.npz")
+losses = data['loss']
+l2_error_u = data['l2_error_u']
+l2_error_v = data['l2_error_v']
+l2_error_p = data['l2_error_p']
+l2_error_total = data['l2_error_total']
+
+# 绘制误差曲线
+plt.figure(dpi=300)
+
+epochs = np.arange(len(l2_error_u))
+
+plt.plot(epochs, l2_error_u, 'b-', label="Normalized L2 Error of U")
+plt.plot(epochs, l2_error_v, 'g-', label="Normalized L2 Error of V")
+plt.plot(epochs, l2_error_p, 'r-', label="Normalized L2 Error of P")
+plt.plot(epochs, l2_error_total, 'k-', label="Normalized L2 Error of Total")
+
+plt.legend()
+plt.xlabel('Epoch')
+plt.ylabel('Normalized L2 Error')
+plt.ylim(0, 1)
+plt.title('Normalized L2 Errors over Epochs')
+plt.savefig("Normalized_L2_Errors.png")
+
+visualize(model, test_inputs, test_labels, losses, path="./videos", dpi=300)
+```
+
+#### 3.5 运行结果
+
+代码执行完毕后，会在`./video`目录下生成图片流，如下所示：
+
+![video_animation](D:\VSCode\video_animation.gif)
+
+所生成的误差曲线图，在对其进行归一化之后如下所示：
+
+![image-20240613163219225](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613163219225.png)
+
+损失曲线如下：
+
+![image-20240613163514757](C:\Users\17492\AppData\Roaming\Typora\typora-user-images\image-20240613163514757.png)
+
+根据误差曲线图，可以得知该模型的性能在训练过程中是逐步提升的

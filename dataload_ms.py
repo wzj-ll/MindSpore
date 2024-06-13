@@ -1,7 +1,9 @@
 import os
 import numpy as np
-import torch
-from torch.utils.data import Dataset
+# import torch
+# from torch.utils.data import Dataset
+from msadapter.pytorch.utils.data import Dataset
+import msadapter.pytorch as torch
 
 class FlowDataset(Dataset):
     def __init__(self, data_dir, bc_points_file, bc_labels_file, ic_points_file, ic_labels_file):

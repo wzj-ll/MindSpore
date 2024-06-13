@@ -1,7 +1,9 @@
-from torch import nn
 import numpy as np
-import torch.optim as optim
-from torch.utils.data import DataLoader
+# from torch import nn
+# from torch.utils.data import DataLoader
+import msadapter.pytorch.nn as nn
+import msadapter.pytorch.optim as optim
+from msadapter.pytorch.utils.data import DataLoader
 from model import DeepModel
 from dataload import create_datasets, create_test_dataset
 from utils import train, evaluate, visualize
@@ -25,20 +27,19 @@ train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
 
 # 实例化模型
 model = DeepModel().to(device)
-
 # 定义损失函数和优化器
 criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
+# optimizer = nn.optim.Adam(model.parameters(), lr=0.001)
+optimizer = optim.SGD(model.trainable_params(), learning_rate=0.01, momentum=0.9)
 # 训练模型
 loss_file = "losses.npz"
 losses, l2_error_u, l2_error_v, l2_error_p, l2_error_total = train(model, 
-        train_loader, criterion, optimizer, epochs=40, device=device, loss_file=loss_file)
+        train_loader, criterion, optimizer, epochs=10, device=device, loss_file=loss_file)
 # 测试数据
 test_inputs, test_labels = create_test_dataset(config["data_dir"])
 
 # 评估模型
-evaluate(model, test_inputs, test_labels, device)
+evaluate(model, test_inputs)
 
 # 可视化结果
 # 加载 loss 值
@@ -66,4 +67,4 @@ plt.ylim(0, 1)
 plt.title('Normalized L2 Errors over Epochs')
 plt.savefig("Normalized_L2_Errors.png")
 
-visualize(model, test_inputs, test_labels, losses, path="./videos", device=device, dpi=300)
+visualize(model, test_inputs, test_labels, losses, path="./videos", dpi=300)

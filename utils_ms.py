@@ -1,9 +1,11 @@
 import matplotlib.pyplot as plt
+import os
 import numpy as np
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.gridspec as gridspec
-import torch
-import os
+import msadapter.pytorch as torch
+import mindspore
+from mindspore import Tensor, context, ops, nn
 
 def normalize_loss(values, new_min=0, new_max=1):
     old_min = np.min(values)
@@ -24,25 +26,26 @@ def train(model, train_loader, criterion, optimizer, epochs, device, loss_file):
         v_error_epoch = 0.0
         p_error_epoch = 0.0
         total_error_epoch = 0.0
+        loss_net = nn.WithLossCell(model, criterion)
+        train_net = nn.TrainOneStepCell(loss_net, optimizer)
 
         for i, (inputs, labels) in enumerate(train_loader):
             inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
+            # optimizer.clear_grad()
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            running_loss += loss.item()
+            # loss = criterion(outputs, labels)
+            res = train_net(inputs, labels)
+            running_loss += res.asnumpy() # type: ignore
 
             # 假设outputs和labels是(batch_size, num_features)
             outputs = outputs.view(-1, 3)  # 调整维度到 (batch_size, 3)
             labels = labels.view(-1, 3)  # 调整维度到 (batch_size, 3)
 
             # Calculate L2 errors for U, V, P, and Total
-            u_error = torch.sqrt(torch.sum((outputs[:, 0] - labels[:, 0]) ** 2)) / torch.sqrt(torch.sum(labels[:, 0] ** 2))
-            v_error = torch.sqrt(torch.sum((outputs[:, 1] - labels[:, 1]) ** 2)) / torch.sqrt(torch.sum(labels[:, 1] ** 2))
-            p_error = torch.sqrt(torch.sum((outputs[:, 2] - labels[:, 2]) ** 2)) / torch.sqrt(torch.sum(labels[:, 2] ** 2))
-            total_error = torch.sqrt(torch.sum((outputs - labels) ** 2)) / torch.sqrt(torch.sum(labels ** 2))
+            u_error = torch.sqrt(torch.sum((outputs[:, 0] - labels[:, 0]) ** 2)) / torch.sqrt(torch.sum(labels[:, 0] ** 2)) # type: ignore
+            v_error = torch.sqrt(torch.sum((outputs[:, 1] - labels[:, 1]) ** 2)) / torch.sqrt(torch.sum(labels[:, 1] ** 2)) # type: ignore
+            p_error = torch.sqrt(torch.sum((outputs[:, 2] - labels[:, 2]) ** 2)) / torch.sqrt(torch.sum(labels[:, 2] ** 2)) # type: ignore
+            total_error = torch.sqrt(torch.sum((outputs - labels) ** 2)) / torch.sqrt(torch.sum(labels ** 2)) # type: ignore
 
             u_error_epoch += u_error.item()
             v_error_epoch += v_error.item()
@@ -74,25 +77,31 @@ def train(model, train_loader, criterion, optimizer, epochs, device, loss_file):
 
     return np.array(all_losses), l2_error_u, l2_error_v, l2_error_p, l2_error_total
 
-def evaluate(model, test_inputs, test_labels, device):
-    model.eval()
-    with torch.no_grad():
-        test_inputs, test_labels = torch.tensor(test_inputs, dtype=torch.float32).to(device), torch.tensor(test_labels, dtype=torch.float32).to(device)
-        predictions = model(test_inputs).cpu().numpy()
-        l2_error = np.sqrt(np.sum((predictions - test_labels.cpu().numpy()) ** 2)) / np.sqrt(np.sum(test_labels.cpu().numpy() ** 2))
-        print(f"L2 Error: {l2_error}")
+def evaluate(model, test_loader):
+    context.set_context(mode=context.PYNATIVE_MODE, device_target="CPU")  # Switch to evaluation mode
+    model.set_train(False)
+    total_loss = 0.0
+    for data in test_loader:
+        inputs, labels = Tensor(data[0]), Tensor(data[1])
+        outputs = model(inputs)
+        loss = ops.ReduceMean()(ops.square(outputs - labels))
+        total_loss += loss.asnumpy() # type: ignore
+    print(f"L2 Error: {total_loss / len(test_loader)}")
 
-def visualize(model, test_inputs, test_labels, losses, path="./videos", device="cpu", dpi=300):
-    model.eval()
-    test_inputs, test_labels = torch.tensor(test_inputs, dtype=torch.float32).to(device), torch.tensor(test_labels, dtype=torch.float32).to(device)
-    with torch.no_grad():
-        predictions = model(test_inputs).cpu().numpy()
+def visualize(model, test_inputs, test_labels, losses, path="./videos", dpi=300):
+    context.set_context(mode=context.PYNATIVE_MODE, device_target="CPU")
+
+    model.set_train(False)  # 设定为评估模式
+    test_inputs, test_labels = Tensor(test_inputs, dtype=mindspore.float32), Tensor(test_labels, dtype=mindspore.float32)
+
+    # MindSpore不需要显式地禁用梯度计算，只需确保模型处于评估模式
+    predictions = model(test_inputs).asnumpy()
     
     sample_t, sample_x, sample_y, _ = test_inputs.shape
 
-    u_vmin, u_vmax = np.percentile(test_labels[:, :, :, 0].cpu(), [0.5, 99.5])
-    v_vmin, v_vmax = np.percentile(test_labels[:, :, :, 1].cpu(), [0.5, 99.5])
-    p_vmin, p_vmax = np.percentile(test_labels[:, :, :, 2].cpu(), [0.5, 99.5])
+    u_vmin, u_vmax = np.percentile(test_labels[:, :, :, 0], [0.5, 99.5])
+    v_vmin, v_vmax = np.percentile(test_labels[:, :, :, 1], [0.5, 99.5])
+    p_vmin, p_vmax = np.percentile(test_labels[:, :, :, 2], [0.5, 99.5])
 
     vmin_list = [u_vmin, v_vmin, p_vmin]
     vmax_list = [u_vmax, v_vmax, p_vmax]
@@ -115,9 +124,9 @@ def visualize(model, test_inputs, test_labels, losses, path="./videos", device="
     l2_error_total = []
 
     for t in t_set:
-        u_label = test_labels[t, :, :, 0].cpu().numpy()
-        v_label = test_labels[t, :, :, 1].cpu().numpy()
-        p_label = test_labels[t, :, :, 2].cpu().numpy()
+        u_label = test_labels[t, :, :, 0]
+        v_label = test_labels[t, :, :, 1]
+        p_label = test_labels[t, :, :, 2]
 
         u_predict = predictions[t, :, :, 0]
         v_predict = predictions[t, :, :, 1]
@@ -181,20 +190,20 @@ def visualize(model, test_inputs, test_labels, losses, path="./videos", device="
         l2_error_total.append(np.sqrt(np.sum(error ** 2)) / np.sqrt(np.sum(label_2d[0] ** 2)))
 
     # 绘制误差变化曲线
-    fig, ax = plt.subplots(dpi=dpi)
-    t_set = np.array(t_set)
-    ax.plot(t_set, l2_error_u, 'b--', label="l2_error of U")
-    ax.plot(t_set, l2_error_v, 'g-.', label="l2_error of V")
-    ax.plot(t_set, l2_error_p, 'k:', label="l2_error of P")
-    ax.plot(t_set, l2_error_total, 'r-', label="l2_error of All")
-    ax.legend()
-    ax.set_xlabel('time')
-    ax.set_ylabel('l2_error')
-    ax.set_xticks(np.arange(0, len(t_set), step=5))
-    ax.set_ylim(0, 0.5)  # 设置纵向轴的范围
-    ax.set_yticks(np.arange(0, 0.5, step=0.05))  # 设置纵向轴的刻度步长为0.05
-    plt.savefig(os.path.join(path, "Error_Curve.png"))
-    plt.close(fig)
+    # fig, ax = plt.subplots(dpi=dpi)
+    # t_set = np.array(t_set)
+    # ax.plot(t_set, l2_error_u, 'b--', label="l2_error of U")
+    # ax.plot(t_set, l2_error_v, 'g-.', label="l2_error of V")
+    # ax.plot(t_set, l2_error_p, 'k:', label="l2_error of P")
+    # ax.plot(t_set, l2_error_total, 'r-', label="l2_error of All")
+    # ax.legend()
+    # ax.set_xlabel('time')
+    # ax.set_ylabel('l2_error')
+    # ax.set_xticks(np.arange(0, len(t_set), step=5))
+    # ax.set_ylim(0, 0.5)  # 设置纵向轴的范围
+    # ax.set_yticks(np.arange(0, 0.5, step=0.05))  # 设置纵向轴的刻度步长为0.05
+    # plt.savefig(os.path.join(path, "Error_Curve.png"))
+    # plt.close(fig)
 
     # 归一化loss值
     normalized_losses = normalize_loss(losses)
