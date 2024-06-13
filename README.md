@@ -230,6 +230,8 @@ L2 Error: 1.0292717218399048
 
 ### 3.1 MindSpore框架介绍
 
+代码仓库地址：https://github.com/wzj-ll/MindSpore?tab=readme-ov-file
+
 MindSpore是华为推出的一款人工智能计算框架，主要用于开发AI应用和模型。它的特点如下:
 
 - 框架设计：MindSpore采用静态计算图设计，PyTorch采用动态计算图设计。静态计算图在模型编译时确定计算过程，动态计算图在运行时确定计算过程。静态计算图通常更高效，动态计算图更灵活；
