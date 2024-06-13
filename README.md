@@ -134,11 +134,18 @@ https://download.mindspore.cn/mindscience/mindflow/dataset/applications/physics_
 ```text
 D:.
 │  dataload.py
+│  dataload_ms.py
 │  losses.npz
 │  model.py
+│  model_ms.py
+│  MSA_F.png
 │  Normalized_L2_Errors.png
+│  README.md
 │  train.py
+│  train_ms.py
 │  utils.py
+│  utils_ms.py
+│  video_animation.gif
 │
 ├─.vscode
 │      settings.json
@@ -192,8 +199,11 @@ D:.
 │
 └─__pycache__
         dataload.cpython-312.pyc
+        dataload.cpython-37.pyc
         model.cpython-312.pyc
+        model.cpython-37.pyc
         utils.cpython-312.pyc
+        utils.cpython-37.pyc
 ```
 
 ### 2.2 运行代码
